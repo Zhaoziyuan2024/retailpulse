@@ -1,0 +1,72 @@
+{
+  "input_sha256": "43465a06f2ccf7c8b5bd2892bc7defb52f97487934fe93b16ae4c3936424676d",
+  "audit": {
+    "input_rows": 541909,
+    "duplicate_rows": 5268,
+    "invalid_rows": 143949,
+    "reason_counts": {
+      "missing_customer": 135037,
+      "missing_invoice": 0,
+      "cancelled": 9251,
+      "invalid_date": 0,
+      "invalid_quantity": 10587,
+      "invalid_price": 2512,
+      "invalid_revenue": 0
+    },
+    "output_rows": 392692
+  },
+  "model_metrics": {
+    "roc_auc": 0.6914698587296452,
+    "average_precision": 0.6656855134936768,
+    "precision_at_20": 0.7302231237322515,
+    "lift_at_20": 1.7017794578646506,
+    "positive_rate": 0.4290938642828119
+  },
+  "baseline_metrics": {
+    "roc_auc": 0.5529463900571552,
+    "average_precision": 0.46917390679029297,
+    "precision_at_20": 0.5010141987829615,
+    "lift_at_20": 1.1676097947015798,
+    "positive_rate": 0.4290938642828119
+  },
+  "split_sizes": {
+    "train": {
+      "customers": 1969,
+      "positives": 617,
+      "positive_rate": 0.3133570340274251,
+      "feature_start": "2011-04-02",
+      "cutoff": "2011-07-01",
+      "label_end": "2011-07-31"
+    },
+    "validation": {
+      "customers": 1923,
+      "positives": 728,
+      "positive_rate": 0.3785751430057202,
+      "feature_start": "2011-06-03",
+      "cutoff": "2011-09-01",
+      "label_end": "2011-10-01"
+    },
+    "test": {
+      "customers": 2461,
+      "positives": 1056,
+      "positive_rate": 0.4290938642828119,
+      "feature_start": "2011-08-03",
+      "cutoff": "2011-11-01",
+      "label_end": "2011-12-01"
+    }
+  },
+  "chosen_C": 0.1,
+  "validation_ap_by_C": {
+    "0.1": 0.6362969513548403,
+    "1.0": 0.6350412879380177,
+    "10.0": 0.6355379221938611
+  },
+  "feature_coefficients": {
+    "recency": 0.24433906138066622,
+    "frequency": 0.7316221899639851,
+    "monetary": 0.2572053275246738,
+    "tenure": -0.0822543516333275,
+    "avg_order_value": -0.11264850036522832,
+    "total_quantity": 0.21199878573253536
+  }
+}

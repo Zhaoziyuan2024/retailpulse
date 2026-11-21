@@ -1,2 +1,86 @@
-# retailpulse
-Business Analytics portfolio: reproducible retail cohorts, RFM segmentation and leakage-aware repeat-purchase prediction.
+# RetailPulse · 零售客户价值与复购分析
+
+面向 **Business Analytics** 的可复现项目：在有限客户运营预算下，哪些既有客户更可能在未来 30 天复购？
+
+结合数据审计、RFM 客户分群、月度 cohort 留存、时间切分预测与简单规则对比，输出可离线打开的中文业务报告。**预测复购概率不等于触达的增量效果**，最终业务价值需要随机实验验证。
+
+## 快速运行
+
+Python 3.11–3.13，首次下载约 23 MB；无需 API Key。
+
+```bash
+python -m venv .venv
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
+pip install -e '.[dev]'
+python scripts/download_data.py
+retailpulse --input data/online-retail.xlsx --out reports
+pytest -q
+```
+
+打开 `reports/report.html`。仓库已包含真实数据运行生成的报告、指标及聚合 CSV，无须安装即可下载查看报告。
+
+## 实际运行结果
+
+使用 541,909 行原始交易，清洗后保留 392,692 行、4,338 位客户。以下为 **2011-11 的 2,461 位测试客户**，前 20% 按向上取整选取 493 人：
+
+| 指标 | 逻辑回归 | Recency 基线 |
+|---|---:|---:|
+| ROC-AUC | 0.6915 | 0.5529 |
+| Average Precision | 0.6657 | 0.4692 |
+| 前 20% 客户实际复购率 | 73.02% | 50.10% |
+| 相对随机选择 lift | 1.70× | 1.17× |
+
+这是单个历史留出月份的预测表现，**不是营销转化率提升**。完整数据审计与结果见 [metrics.json](reports/metrics.json)，图文结果见 [中文报告](reports/report.html)（下载后浏览器打开）。
+
+## 方法与口径
+
+| 环节 | 实现及取舍 |
+|---|---|
+| 数据质量 | 校验必要列，剔除缺失客户、取消单、非正数量/单价、无效时间、重复行；保存审计计数 |
+| 金额 | GBP 正向销售额；不抵扣退货，不称净收入或利润 |
+| RFM | 90 天特征窗口，金额上四分位及明确的购买天数/频次阈值分群 |
+| 留存 | 首次观察购买月份为 cohort；当月有购买即留存；完整未活跃月份为 0，未观察月份为空；排除末尾不完整月份 |
+| 特征 | recency、frequency、monetary、窗口内 tenure、平均订单金额、总购买数量 |
+| 预测目标 | 过去 90 天有购买的客户，未来 30 天是否再次购买 |
+| 模型 | log1p → 标准化 → 逻辑回归；预处理仅拟合训练集，验证集选择 C |
+| 基线 | 仅按 recency 排序，避免复杂模型没有业务增益仍被包装为成果 |
+| 指标 | ROC-AUC、Average Precision、前 20% 精确率与相对随机选择的 lift |
+
+### 时间切分
+
+- 训练：2011-07-01 快照，标签区间 `[2011-07-01, 2011-07-31)`。
+- 验证：2011-09-01 快照，标签区间 `[2011-09-01, 2011-10-01)`。
+- 测试：2011-11-01 快照，标签区间 `[2011-11-01, 2011-12-01)`。
+
+每个快照只读取前 90 天特征；cutoff 当日及之后的数据只用于标签。同一客户可以跨快照出现，模拟为已有客户持续评分；客户 ID 不输入模型。测试集不调参，模型没有用验证集重新拟合。读取完整原始文件仅是批处理方式，不意味着特征可以看到未来。
+
+## 业务落地建议
+
+1. 先比较模型与 recency 基线的预算内精确率，判断复杂度是否值得。
+2. 高价值沉默客户可作为召回实验候选，近期单次客户可作为二购引导候选；规则是分析假设，不是已验证策略。
+3. 在候选客户内随机分配触达组/不触达组，预注册 30 天每客户增量毛利和退订护栏。没有成本、毛利与触达记录，本项目不报告 ROI 或因果提升。
+
+## 结构与输出
+
+```text
+retailpulse/core.py       # 清洗、时间快照、留存、模型评估
+retailpulse/cli.py        # 分群及离线中文 HTML 图文报告
+scripts/download_data.py # 官方数据下载及 SHA256
+reports/                 # 真实数据运行产生的聚合结果
+tests/test_core.py       # 清洗、边界、未来信息泄露、留存截尾
+.github/workflows/       # Python 3.11 / 3.13 自动测试
+```
+
+报告自动生成结论，`metrics.json` 保存完整审计、时间窗口、模型系数和指标；`cohort_retention.csv`、`segments.csv` 可直接用于进一步 BI 分析。`requirements-lock.txt` 记录本次 Python 3.13 运行依赖版本；精确复现可先执行 `pip install -r requirements-lock.txt`，再安装项目。
+
+## 局限
+
+这是 2010–2011 年的单一英国在线零售商历史数据，包含批发交易；11 月测试可能受节日季节性影响。首次观察不等于真正获客时间，90 天窗口不覆盖更久未活跃客户。删除完全重复行是假设重复记录而非真实同款重复行；退货被排除会高估净客户价值。最后交易日被用作观测边界，不能证明期间日志完整。仅一次时间留出、无置信区间，不把小幅指标差异说成统计显著。
+
+逻辑回归系数是经过 log1p 和标准化后条件关联的方向，不是因果效应。没有部署、真实用户量或商业收入的声称。
+
+## 数据与许可
+
+Chen, D. (2015). **Online Retail** [Dataset]. UCI Machine Learning Repository. DOI: [10.24432/C5BW33](https://doi.org/10.24432/C5BW33)。[官方数据页](https://archive.ics.uci.edu/dataset/352/online-retail)，数据许可 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)。原始数据 541,909 行；本项目进行了清洗及聚合。原始数据不提交到 GitHub。
+
+项目代码采用 MIT 许可；数据及其派生聚合结果保留上述署名与 CC BY 4.0 许可。
